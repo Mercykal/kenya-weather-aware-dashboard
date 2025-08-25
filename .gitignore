@@ -42,3 +42,4 @@ secrets.yaml
 .idea/
 *.swp
 *.swo
+.DS_Store
