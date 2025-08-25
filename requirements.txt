@@ -1,0 +1,8 @@
+requests
+pandas
+sqlalchemy
+psycopg2-binary
+python-dotenv
+mage-ai[psycopg2]
+sshtunnel
+Pillow
