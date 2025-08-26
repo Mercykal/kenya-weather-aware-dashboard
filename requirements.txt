@@ -1,8 +1,10 @@
 requests
-pandas
-sqlalchemy
+pandas==2.1.4
+sqlalchemy==1.4.20
 psycopg2-binary
 python-dotenv
-mage-ai[psycopg2]
 sshtunnel
 Pillow
+mage-ai[psycopg2]==0.9.76
+tornado==6.4.2
+jupyter-client==7.4.4

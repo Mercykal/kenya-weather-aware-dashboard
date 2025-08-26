@@ -1,67 +1,65 @@
-import os
 import pandas as pd
 import random
 from datetime import datetime, timedelta
-from sqlalchemy import create_engine
-from dotenv import load_dotenv
-# --- Data Transformation Functions ---
 
-def transform_weather_data(weather_data_raw):
-    """Cleans and transforms raw weather data to match the database schema."""
+# This import is mandatory for any transformer block
+if 'transformer' not in globals():
+    from mage_ai.data_preparation.decorators import transformer
+
+# --- Helper Transformation Functions ---
+
+# This function remains UNCHANGED
+def transform_weather_data(weather_data_raw: list) -> pd.DataFrame:
+    """Cleans and transforms raw weather data."""
     if not weather_data_raw:
         return pd.DataFrame()
-
     df = pd.DataFrame(weather_data_raw)
-    
-    # Extract nested data into separate columns
     df['temperature'] = df['main'].apply(lambda x: x.get('temp'))
     df['wind_speed_ms'] = df['wind'].apply(lambda x: x.get('speed'))
-    # Handle cases where 'rain' data is not present
     df['rainfall_mm'] = df['rain'].apply(lambda x: x.get('3h', 0) if isinstance(x, dict) else 0)
     df['forecast_time'] = pd.to_datetime(df['dt_txt'])
-    
-    # Select and rename columns to match the 'weather_forecasts' table
     df_transformed = df[['city', 'forecast_time', 'temperature', 'rainfall_mm', 'wind_speed_ms']].copy()
-    df_transformed.rename(columns={'city': 'city_name'}, inplace=True) # Renaming to avoid confusion with city table
-    
-    # Add a primary key
+    df_transformed.rename(columns={'city': 'city_name'}, inplace=True)
     df_transformed.insert(0, 'forecast_id', range(1, 1 + len(df_transformed)))
-    
     print("Weather data transformed successfully.")
     return df_transformed
 
-def transform_product_data(product_data_raw):
+# This function remains UNCHANGED
+def transform_product_data(product_data_raw: list) -> pd.DataFrame:
     """Cleans and transforms raw product data."""
     if not product_data_raw:
         return pd.DataFrame()
-        
     df = pd.DataFrame(product_data_raw)
-    
-    # Select and rename columns for the 'products' table
     df_transformed = df[['id', 'title', 'price', 'category']].copy()
     df_transformed.rename(columns={'id': 'product_id', 'title': 'name'}, inplace=True)
-    
     print("Product data transformed successfully.")
     return df_transformed
 
-def transform_customer_data(customer_data_raw):
-    """Cleans and transforms raw customer data."""
+# --- THIS IS THE MODIFIED FUNCTION ---
+def transform_customer_data(customer_data_raw: list) -> pd.DataFrame:
+    """Cleans and transforms raw customer data, assigning Kenyan cities."""
     if not customer_data_raw:
         return pd.DataFrame()
 
     df = pd.DataFrame(customer_data_raw)
     
-    # Extract city from the nested 'address' dictionary
-    df['city'] = df['address'].apply(lambda x: x.get('city'))
+    # Define the list of actual Kenyan cities for the project.
+    kenyan_cities = ["Nairobi", "Mombasa", "Kisumu", "Eldoret", "Nakuru"]
     
-    # Select and rename columns for the 'customers' table
+    # Create a new 'city' column by randomly assigning a city from the list to each row.
+    # This OVERWRITES the fake city data that came from the API.
+    df['city'] = [random.choice(kenyan_cities) for _ in range(len(df))]
+
+    # The rest of the function remains the same.
     df_transformed = df[['id', 'firstname', 'lastname', 'email', 'city']].copy()
     df_transformed.rename(columns={'id': 'customer_id', 'firstname': 'first_name', 'lastname': 'last_name'}, inplace=True)
     
-    print("Customer data transformed successfully.")
+    print("Customer data transformed successfully with Kenyan cities.")
     return df_transformed
+# --- END OF MODIFIED FUNCTION ---
 
-def generate_mock_orders(customers_df, products_df, num_orders=200):
+# This function remains UNCHANGED
+def generate_mock_orders(customers_df: pd.DataFrame, products_df: pd.DataFrame, num_orders: int = 200) -> pd.DataFrame:
     """Generates a DataFrame of mock orders."""
     if customers_df.empty or products_df.empty:
         return pd.DataFrame()
@@ -84,54 +82,20 @@ def generate_mock_orders(customers_df, products_df, num_orders=200):
     print(f"{num_orders} mock orders generated successfully.")
     return pd.DataFrame(orders_data)
 
-# --- Main Execution Block ---
-
-if __name__ == "__main__":
-    # 1. EXTRACT raw data using functions from the other script
-    print("--- Starting Data Extraction ---")
-    api_key = os.getenv("OPENWEATHER_API_KEY")
-    weather_raw = fetch_weather_data(api_key, CITIES)
-    products_raw = fetch_product_data()
-    customers_raw = fetch_customer_data()
-    
-    # 2. TRANSFORM the raw data into clean DataFrames
-    print("\n--- Starting Data Transformation ---")
-    weather_df = transform_weather_data(weather_raw)
-    products_df = transform_product_data(products_raw)
-    customers_df = transform_customer_data(customers_raw)
-    orders_df = generate_mock_orders(customers_df, products_df)
-    
-    # 3. LOAD the clean DataFrames into the PostgreSQL database
-    print("\n--- Starting Data Loading ---")
-    try:
-        # Use .to_sql() to write each DataFrame to a new table
-        # if_exists='replace' will drop the table if it already exists and create a new one.
-        # This is useful for development and running the script multiple times.
-        weather_df.to_sql('weather_forecasts', engine, if_exists='replace', index=False)
-        print("Successfully loaded 'weather_forecasts' table.")
-        products_df.to_sql('products', engine, if_exists='replace', index=False)
-        print("Successfully loaded 'products' table.")
-        customers_df.to_sql('customers', engine, if_exists='replace', index=False)
-        print("Successfully loaded 'customers' table.")
-        orders_df.to_sql('orders', engine, if_exists='replace', index=False)
-        print("Successfully loaded 'orders' table.")
-        
-        print("\nAll data has been loaded into the PostgreSQL database successfully.")
-        
-    except Exception as e:
-        print(f"An error occurred during data loading: {e}")
+# This main decorated function remains UNCHANGED
 @transformer
-def transform_data(data, *args, **kwargs):
+def transform_data(data: dict, *args, **kwargs) -> dict:
     """
-    Template code for a transformer block.
+    Takes the raw data from the loader, transforms it, generates mock orders,
+    and returns a dictionary of clean DataFrames.
     """
-    # The 'data' variable is a dictionary from the previous block
     weather_df = transform_weather_data(data.get('weather'))
     products_df = transform_product_data(data.get('products'))
     customers_df = transform_customer_data(data.get('customers'))
     orders_df = generate_mock_orders(customers_df, products_df)
 
-    # Return the final, clean DataFrames
+    print("All data transformed and mock orders generated.")
+
     return {
         "weather_forecasts": weather_df,
         "products": products_df,
